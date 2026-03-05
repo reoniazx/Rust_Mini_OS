@@ -11,9 +11,9 @@ pub struct PageTableEntry {
 }
 
 pub struct MemoryManager {
-    /// frame_map[pfn] = Some(pid) ถ้าถูกใช้งาน
+    /// frame_map[pfn] = Some(pid) if in use
     frame_map: Vec<Option<u32>>,
-    /// page_table[pid] = list ของ VPN→PFN
+    /// page_table[pid] = list of VPN→PFN mappings
     page_tables: HashMap<u32, Vec<PageTableEntry>>,
     pub enabled: bool,
 }
@@ -39,11 +39,11 @@ impl MemoryManager {
         println!("  free <pid>");
     }
 
-    /// จองหน่วยความจำให้ pid ขนาด size_kb KB
+    /// Allocate memory for pid of size_kb KB
     pub fn alloc(&mut self, pid: u32, size_kb: u32) -> Result<(), String> {
         let pages_needed = (size_kb as usize + 3) / 4; // ceil(size_kb / 4)
 
-        // หา free frames
+        // Find free frames
         let free_frames: Vec<usize> = self.frame_map
             .iter()
             .enumerate()
@@ -54,7 +54,7 @@ impl MemoryManager {
 
         if free_frames.len() < pages_needed {
             return Err(format!(
-                "ไม่มี frame ว่างเพียงพอ (ต้องการ {} frames, มีว่าง {})",
+                "Not enough free frames (need {} frames, available {})",
                 pages_needed, free_frames.len()
             ));
         }
@@ -78,16 +78,16 @@ impl MemoryManager {
         Ok(())
     }
 
-    /// แปลง Logical Address เป็น Physical Address
+    /// Translate Logical Address to Physical Address
     pub fn translate(&self, pid: u32, logical_addr: u32) -> Result<(), String> {
         let table = self.page_tables.get(&pid)
-            .ok_or_else(|| format!("ไม่พบ page table ของ PID={}", pid))?;
+            .ok_or_else(|| format!("Page table not found for PID={}", pid))?;
 
         let vpn    = logical_addr / PAGE_SIZE;
         let offset = logical_addr % PAGE_SIZE;
 
         let entry = table.iter().find(|e| e.vpn == vpn)
-            .ok_or_else(|| format!("VPN={} ไม่อยู่ใน page table ของ PID={}", vpn, pid))?;
+            .ok_or_else(|| format!("VPN={} not found in page table of PID={}", vpn, pid))?;
 
         let physical_addr = entry.pfn * PAGE_SIZE + offset;
 
@@ -98,15 +98,15 @@ impl MemoryManager {
         Ok(())
     }
 
-    /// คืน frame ทั้งหมดของ pid
+    /// Free all frames of pid
     pub fn free(&mut self, pid: u32) -> Result<(), String> {
         let table = self.page_tables.remove(&pid)
-            .ok_or_else(|| format!("ไม่พบ page table ของ PID={}", pid))?;
+            .ok_or_else(|| format!("Page table not found for PID={}", pid))?;
 
         for e in &table {
             self.frame_map[e.pfn as usize] = None;
         }
-        println!("[OK] Freed {} frames จาก PID={}", table.len(), pid);
+        println!("[OK] Freed {} frames from PID={}", table.len(), pid);
         Ok(())
     }
 

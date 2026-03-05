@@ -1,10 +1,10 @@
 use crate::scheduler::{GanttSlice, ScheduleResult};
 
-/// วาด Gantt Chart แบบ text
+/// Draw Gantt Chart as text
 pub fn print_gantt(gantt: &[GanttSlice]) {
     println!("\n  Gantt Chart:");
 
-    // แถวบน: ชื่อ process
+    // Top row: process names
     print!("  |");
     for s in gantt {
         let width = (s.end - s.start) as usize * 2;
@@ -13,7 +13,7 @@ pub fn print_gantt(gantt: &[GanttSlice]) {
     }
     println!();
 
-    // แถวล่าง: เวลา
+    // Bottom row: time
     print!("  ");
     let mut prev_end = u32::MAX;
     for s in gantt {
@@ -29,7 +29,7 @@ pub fn print_gantt(gantt: &[GanttSlice]) {
     println!();
 }
 
-/// แสดงตาราง metrics ต่อ process
+/// Display metrics table per process
 pub fn print_results(res: &ScheduleResult) {
     println!(
         "\n  {:<6} {:<10} {:<8} {:<8} {:<12} {:<10}",

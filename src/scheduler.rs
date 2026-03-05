@@ -1,6 +1,6 @@
 use crate::process::Pcb;
 
-/// หนึ่ง slice บน Gantt Chart
+/// One slice on the Gantt Chart
 #[derive(Debug, Clone)]
 pub struct GanttSlice {
     pub pid: u32,
@@ -8,7 +8,7 @@ pub struct GanttSlice {
     pub end: u32,
 }
 
-/// ผลลัพธ์ต่อ process
+/// Result per process
 #[derive(Debug)]
 pub struct ProcResult {
     pub pid: u32,
@@ -74,7 +74,7 @@ pub fn sjf(processes: &[Pcb]) -> ScheduleResult {
     let mut results: Vec<ProcResult> = Vec::new();
 
     while !remaining.is_empty() {
-        // หา process ที่ arrive แล้ว และมี burst_time น้อยสุด
+        // Find arrived process with shortest burst_time
         let ready: Vec<usize> = remaining
             .iter()
             .enumerate()
@@ -83,7 +83,7 @@ pub fn sjf(processes: &[Pcb]) -> ScheduleResult {
             .collect();
 
         if ready.is_empty() {
-            // CPU idle — กระโดดไปยัง arrival ที่ใกล้สุด
+            // CPU idle — jump to nearest arrival time
             let next = remaining.iter().map(|p| p.arrival_time).min().unwrap();
             time = next;
             continue;
@@ -131,7 +131,7 @@ pub fn round_robin(processes: &[Pcb], quantum: u32) -> ScheduleResult {
     let mut results: Vec<ProcResult> = Vec::new();
     let mut arrived_idx = 0usize;
 
-    // ใส่ process แรกที่ arrive เวลา 0 เข้า queue
+    // Add initial processes that arrive at time 0 to queue
     while arrived_idx < procs.len() && procs[arrived_idx].arrival_time <= time {
         queue.push_back(procs[arrived_idx].clone());
         arrived_idx += 1;
@@ -151,7 +151,7 @@ pub fn round_robin(processes: &[Pcb], quantum: u32) -> ScheduleResult {
             end: time,
         });
 
-        // ดึง process ที่ arrive ระหว่าง slice นี้เข้า queue
+        // Add processes that arrive during this slice to queue
         while arrived_idx < procs.len() && procs[arrived_idx].arrival_time <= time {
             queue.push_back(procs[arrived_idx].clone());
             arrived_idx += 1;
@@ -169,10 +169,10 @@ pub fn round_robin(processes: &[Pcb], quantum: u32) -> ScheduleResult {
                 waiting_time: wt,
             });
         } else {
-            queue.push_back(p); // ยังไม่เสร็จ ใส่กลับไป
+            queue.push_back(p); // Not finished, put back in queue
         }
 
-        // ถ้า queue ว่างแต่ยังมี process ที่ยังไม่ arrive
+        // If queue is empty but there are still processes that haven't arrived
         if queue.is_empty() && arrived_idx < procs.len() {
             time = procs[arrived_idx].arrival_time;
             while arrived_idx < procs.len() && procs[arrived_idx].arrival_time <= time {
@@ -182,13 +182,13 @@ pub fn round_robin(processes: &[Pcb], quantum: u32) -> ScheduleResult {
         }
     }
 
-    // เรียงผลลัพธ์ตาม pid
+    // Sort results by pid
     results.sort_by_key(|r| r.pid);
     compute_averages(gantt, results)
 }
 
 // ─────────────────────────────────────────
-//  Priority (Non-preemptive, ค่าน้อย = priority สูง)
+//  Priority (Non-preemptive, lower value = higher priority)
 // ─────────────────────────────────────────
 pub fn priority_scheduling(processes: &[Pcb]) -> ScheduleResult {
     let mut remaining: Vec<Pcb> = processes.to_vec();

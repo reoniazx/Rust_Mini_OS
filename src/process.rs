@@ -17,7 +17,7 @@ pub struct Pcb {
     pub arrival_time: u32,
     pub burst_time: u32,
     pub remaining_time: u32,
-    pub priority: u32, // ค่าน้อย = priority สูงกว่า
+    pub priority: u32, // lower value = higher priority
     pub state: ProcessState,
 }
 
@@ -55,10 +55,10 @@ impl ProcessManager {
         pid
     }
 
-    /// แสดงรายการ process ทั้งหมด
+    /// List all processes
     pub fn list(&self) {
         if self.processes.is_empty() {
-            println!("  (ยังไม่มี process)");
+            println!("  (no processes yet)");
             return;
         }
         println!(

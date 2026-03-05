@@ -25,7 +25,7 @@ fn main() {
     println!("╔══════════════════════════════════════╗");
     println!("║       OS Simulator — Rust Edition    ║");
     println!("╚══════════════════════════════════════╝");
-    println!("  พิมพ์ 'help' เพื่อดูคำสั่งทั้งหมด\n");
+    println!("  Type 'help' to see all commands\n");
 
     loop {
         print!("os-sim> ");
@@ -47,7 +47,7 @@ fn main() {
             // ── Process ────────────────────────────────────────────
             "add_process" | "add" => {
                 // add_process <pid> <arrival> <burst> <priority>
-                // (pid ถูก ignore — กำหนดอัตโนมัติ)
+                // (pid is ignored — assigned automatically)
                 if parts.len() < 4 {
                     eprintln!("  usage: add_process <pid> <arrival> <burst> <priority>");
                     continue;
@@ -75,7 +75,7 @@ fn main() {
 
             "clear" => {
                 mgr.clear();
-                println!("[OK] ล้างรายการ process ทั้งหมด");
+                println!("[OK] All processes cleared");
             }
 
             // ── Scheduler ──────────────────────────────────────────
@@ -86,7 +86,7 @@ fn main() {
                     continue;
                 }
                 if mgr.processes.is_empty() {
-                    println!("  ยังไม่มี process");
+                    println!("  No processes yet");
                     continue;
                 }
 
@@ -113,7 +113,7 @@ fn main() {
                         priority_scheduling(&mgr.processes)
                     }
                     _ => {
-                        println!("  ไม่รู้จัก algorithm '{}'", parts[1]);
+                        println!("  Unknown algorithm '{}'", parts[1]);
                         continue;
                     }
                 };
@@ -125,12 +125,12 @@ fn main() {
 
             "show_gantt" => match &last_result {
                 Some(res) => print_gantt(&res.gantt),
-                None => println!("  ยังไม่ได้รัน scheduler"),
+                None => println!("  Scheduler has not been run yet"),
             },
 
             "show_table" => match &last_result {
                 Some(res) => print_results(res),
-                None => println!("  ยังไม่ได้รัน scheduler"),
+                None => println!("  Scheduler has not been run yet"),
             },
 
             // ── Page Replacement ───────────────────────────────────
@@ -149,7 +149,7 @@ fn main() {
                     "LRU" => lru(frames, &refs),
                     "OPTIMAL" | "OPT" => optimal(frames, &refs),
                     _ => {
-                        println!("  ไม่รู้จัก algorithm '{}'", alg);
+                        println!("  Unknown algorithm '{}'", alg);
                         continue;
                     }
                 };
@@ -169,7 +169,7 @@ fn main() {
                     continue;
                 }
                 if !mem.enabled {
-                    println!("  รัน 'simulate_memory paging' ก่อน");
+                    println!("  Run 'simulate_memory paging' first");
                     continue;
                 }
                 let pid = parse_u32(parts[1]);
@@ -186,7 +186,7 @@ fn main() {
                     continue;
                 }
                 if !mem.enabled {
-                    println!("  รัน 'simulate_memory paging' ก่อน");
+                    println!("  Run 'simulate_memory paging' first");
                     continue;
                 }
                 let pid = parse_u32(parts[1]);
@@ -202,7 +202,7 @@ fn main() {
                     continue;
                 }
                 if !mem.enabled {
-                    println!("  รัน 'simulate_memory paging' ก่อน");
+                    println!("  Run 'simulate_memory paging' first");
                     continue;
                 }
                 let pid = parse_u32(parts[1]);
@@ -233,7 +233,7 @@ fn main() {
                     continue;
                 }
                 if dsk.alloc_mode.is_none() {
-                    println!("  รัน 'simulate_disk <mode>' ก่อน");
+                    println!("  Run 'simulate_disk <mode>' first");
                     continue;
                 }
                 let size = parse_usize(parts[2]);
@@ -278,7 +278,7 @@ fn main() {
             }
 
             "add_proc_dl" => {
-                // add_proc_dl <pid> <max_need>  เช่น  add_proc_dl 1 printer:2,disk:1
+                // add_proc_dl <pid> <max_need>  e.g.  add_proc_dl 1 printer:2,disk:1
                 if parts.len() < 3 {
                     eprintln!("  usage: add_proc_dl <pid> <device:n,...>");
                     continue;
@@ -320,11 +320,11 @@ fn main() {
             }
 
             "exit" | "quit" | "q" => {
-                println!("  ลาก่อน!");
+                println!("  Goodbye!");
                 break;
             }
 
-            _ => println!("  ไม่รู้จักคำสั่ง '{}'  พิมพ์ 'help' เพื่อดูคำสั่ง", parts[0]),
+            _ => println!("  Unknown command '{}'  type 'help' to see commands", parts[0]),
         }
         println!();
     }
@@ -332,13 +332,13 @@ fn main() {
 
 fn parse_u32(s: &str) -> u32 {
     s.parse::<u32>().unwrap_or_else(|_| {
-        eprintln!("  ⚠ '{}' ไม่ถูกต้อง ใช้ 0", s);
+        eprintln!("  ⚠ '{}' is invalid, using 0", s);
         0
     })
 }
 fn parse_usize(s: &str) -> usize {
     s.parse::<usize>().unwrap_or_else(|_| {
-        eprintln!("  ⚠ '{}' ไม่ถูกต้อง ใช้ 0", s);
+        eprintln!("  ⚠ '{}' is invalid, using 0", s);
         0
     })
 }
@@ -376,17 +376,17 @@ fn print_help() {
   ls
   map <file>
 
-  ─── อื่นๆ ───────────────────────────────────────────────────
+  ─── Miscellaneous ───────────────────────────────────────────
   help
   exit
 
-  ─── I/O & Deadlock (เสริม) ───────────────────────────────────
-  add_device <device> <instances>       เพิ่ม I/O device
-  add_proc_dl <pid> <device:n,...>      ลงทะเบียน process + max need
-  io_request <pid> <device> <amount>    ขอ resource
-  io_release <pid> <device> <amount>    คืน resource
-  io_status                             แสดงสถานะ device ทั้งหมด
-  detect_deadlock                       ตรวจ deadlock (RAG cycle)
+  ─── I/O & Deadlock (extra) ───────────────────────────────────
+  add_device <device> <instances>       Add I/O device
+  add_proc_dl <pid> <device:n,...>      Register process + max need
+  io_request <pid> <device> <amount>    Request resource
+  io_release <pid> <device> <amount>    Release resource
+  io_status                             Show all device status
+  detect_deadlock                       Detect deadlock (RAG cycle)
   bankers                               Banker Algorithm (safe sequence)
 "
     );

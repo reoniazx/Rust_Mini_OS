@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-const DISK_SIZE: usize = 50; // ตาม Slide ตัวอย่าง (สามารถเปลี่ยนเป็น 1000 ได้)
+const DISK_SIZE: usize = 50; // as per example slide (can be changed to 1000)
 
 #[derive(Debug, Clone)]
 pub enum AllocType { Contiguous, Linked, Indexed }
@@ -19,8 +19,8 @@ impl std::fmt::Display for AllocType {
 pub struct FileEntry {
     pub name:        String,
     pub alloc_type:  AllocType,
-    pub blocks:      Vec<usize>, // block numbers ที่ใช้ทั้งหมด
-    pub index_block: Option<usize>, // สำหรับ Indexed allocation
+    pub blocks:      Vec<usize>, // all block numbers used
+    pub index_block: Option<usize>, // for Indexed allocation
 }
 
 pub struct DiskManager {
@@ -57,7 +57,7 @@ impl DiskManager {
 
     pub fn create(&mut self, name: &str, size: usize) -> Result<(), String> {
         if self.files.contains_key(name) {
-            return Err(format!("ไฟล์ '{}' มีอยู่แล้ว", name));
+            return Err(format!("File '{}' already exists", name));
         }
 
         match &self.alloc_mode.clone().unwrap_or(AllocType::Contiguous) {
@@ -68,9 +68,9 @@ impl DiskManager {
     }
 
     fn create_contiguous(&mut self, name: &str, size: usize) -> Result<(), String> {
-        // หา run ต่อเนื่องที่ว่างพอ
+        // Find a contiguous run with enough free space
         let start = self.find_contiguous(size)
-            .ok_or_else(|| format!("ไม่มีพื้นที่ต่อเนื่อง {} blocks", size))?;
+            .ok_or_else(|| format!("No contiguous space for {} blocks", size))?;
 
         let blocks: Vec<usize> = (start..start + size).collect();
         for &b in &blocks { self.disk[b] = true; }
@@ -93,7 +93,7 @@ impl DiskManager {
             .collect();
 
         if free.len() < size {
-            return Err(format!("ไม่มี block ว่างพอ (ต้องการ {}, มีว่าง {})", size, free.len()));
+            return Err(format!("Not enough free blocks (need {}, available {})", size, free.len()));
         }
 
         for &b in &free { self.disk[b] = true; }
@@ -109,7 +109,7 @@ impl DiskManager {
     }
 
     fn create_indexed(&mut self, name: &str, size: usize) -> Result<(), String> {
-        // ต้องการ size + 1 blocks (1 index block + size data blocks)
+        // Need size + 1 blocks (1 index block + size data blocks)
         let free: Vec<usize> = self.disk.iter().enumerate()
             .filter(|&(_, &used)| !used)
             .map(|(i, _)| i)
@@ -117,7 +117,7 @@ impl DiskManager {
             .collect();
 
         if free.len() < size + 1 {
-            return Err(format!("ไม่มี block ว่างพอ (ต้องการ {}, มีว่าง {})", size + 1, free.len()));
+            return Err(format!("Not enough free blocks (need {}, available {})", size + 1, free.len()));
         }
 
         let index_block = free[0];
@@ -137,7 +137,7 @@ impl DiskManager {
 
     pub fn delete(&mut self, name: &str) -> Result<(), String> {
         let entry = self.files.remove(name)
-            .ok_or_else(|| format!("ไม่พบไฟล์ '{}'", name))?;
+            .ok_or_else(|| format!("File '{}' not found", name))?;
 
         for &b in &entry.blocks { self.disk[b] = false; }
         if let Some(ib) = entry.index_block { self.disk[ib] = false; }
@@ -148,7 +148,7 @@ impl DiskManager {
 
     pub fn ls(&self) {
         if self.files.is_empty() {
-            println!("  (ไม่มีไฟล์)");
+            println!("  (no files)");
         } else {
             println!("FILES:");
             for (_, f) in &self.files {
@@ -174,7 +174,7 @@ impl DiskManager {
 
     pub fn map(&self, name: &str) -> Result<(), String> {
         let f = self.files.get(name)
-            .ok_or_else(|| format!("ไม่พบไฟล์ '{}'", name))?;
+            .ok_or_else(|| format!("File '{}' not found", name))?;
 
         let all: Vec<String> = f.blocks.iter().map(|b| b.to_string()).collect();
         print!("{} -> ", name);
@@ -185,7 +185,7 @@ impl DiskManager {
         Ok(())
     }
 
-    // หา block ต่อเนื่องที่ว่าง
+    // Find contiguous free blocks
     fn find_contiguous(&self, size: usize) -> Option<usize> {
         let mut count = 0;
         let mut start = 0;

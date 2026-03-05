@@ -19,7 +19,7 @@ pub struct PageSummary {
 //  FIFO
 // ─────────────────────────────────────────
 pub fn fifo(frames: usize, refs: &[u32]) -> PageSummary {
-    let mut queue: VecDeque<u32> = VecDeque::new(); // ลำดับการเข้า
+    let mut queue: VecDeque<u32> = VecDeque::new(); // order of entry
     let mut frame_set: Vec<Option<u32>> = vec![None; frames];
     let mut results = Vec::new();
     let mut faults = 0;
@@ -35,13 +35,13 @@ pub fn fifo(frames: usize, refs: &[u32]) -> PageSummary {
         } else {
             faults += 1;
             if queue.len() < frames {
-                // ยังมีที่ว่าง
+                // Still has free space
                 let slot = frame_set.iter().position(|f| f.is_none()).unwrap();
                 frame_set[slot] = Some(page);
                 queue.push_back(page);
                 evicted = None;
             } else {
-                // evict หน้าแรกที่เข้ามา
+                // Evict the first page that entered
                 let victim = queue.pop_front().unwrap();
                 let slot = frame_set.iter().position(|f| *f == Some(victim)).unwrap();
                 frame_set[slot] = Some(page);
@@ -81,11 +81,11 @@ pub fn lru(frames: usize, refs: &[u32]) -> PageSummary {
         } else {
             faults += 1;
             if let Some(slot) = frame_set.iter().position(|f| f.is_none()) {
-                // ยังมีที่ว่าง
+                // Still has free space
                 frame_set[slot] = Some(page);
                 evicted = None;
             } else {
-                // หา page ที่ใช้นานสุด (last_used น้อยสุด)
+                // Find page used longest ago (smallest last_used)
                 let victim = frame_set
                     .iter()
                     .filter_map(|f| *f)
@@ -132,7 +132,7 @@ pub fn optimal(frames: usize, refs: &[u32]) -> PageSummary {
                 frame_set[slot] = Some(page);
                 evicted = None;
             } else {
-                // หา page ที่จะถูกใช้ช้าที่สุดในอนาคต (หรือไม่ถูกใช้เลย)
+                // Find page used furthest in future (or never used again)
                 let future = &refs[i + 1..];
                 let victim = frame_set
                     .iter()

@@ -1,9 +1,9 @@
 // ─────────────────────────────────────────────────────────────
 //  I/O & Deadlock Simulation
 //
-//  จำลอง Resource Allocation Graph (RAG)
-//  - Process ขอ resource → ถ้าว่างให้เลย, ถ้าไม่ว่างรอ
-//  - ตรวจ Deadlock ด้วย Cycle Detection
+//  Simulate Resource Allocation Graph (RAG)
+//  - Process requests resource → if available grant immediately, else wait
+//  - Detect Deadlock using Cycle Detection
 //  - Banker's Algorithm (Safety Check)
 // ─────────────────────────────────────────────────────────────
 
@@ -13,10 +13,10 @@ use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct IoDevice {
-    pub instances: usize,     // จำนวน instance ทั้งหมด
-    pub available: usize,     // instance ที่ยังว่าง
-    pub held_by: Vec<u32>,    // pid ที่ถือครองอยู่
-    pub wait_queue: Vec<u32>, // pid ที่รอ
+    pub instances: usize,     // total number of instances
+    pub available: usize,     // available instances
+    pub held_by: Vec<u32>,    // pids currently holding
+    pub wait_queue: Vec<u32>, // pids waiting
 }
 
 impl IoDevice {
@@ -34,11 +34,11 @@ impl IoDevice {
 
 pub struct DeadlockManager {
     pub devices: HashMap<String, IoDevice>,
-    /// allocation[pid][device] = จำนวนที่ถือครอง
+    /// allocation[pid][device] = amount currently held
     pub allocation: HashMap<u32, HashMap<String, usize>>,
-    /// request[pid][device] = จำนวนที่รอ
+    /// request[pid][device] = amount waiting
     pub request: HashMap<u32, HashMap<String, usize>>,
-    /// max_need[pid][device] = ต้องการสูงสุด (Banker's)
+    /// max_need[pid][device] = maximum need (Banker's)
     pub max_need: HashMap<u32, HashMap<String, usize>>,
     pub processes: Vec<u32>,
 }
@@ -59,12 +59,12 @@ impl DeadlockManager {
     pub fn add_device(&mut self, name: &str, instances: usize) {
         self.devices
             .insert(name.to_string(), IoDevice::new(instances));
-        println!("[OK] เพิ่ม device '{}' จำนวน {} instance", name, instances);
+        println!("[OK] Added device '{}' with {} instance(s)", name, instances);
     }
 
     // ── add_process ──────────────────────────────────────────
-    /// ลงทะเบียน process และกำหนด max need (Banker's)
-    /// max_str เช่น "printer:2,disk:1"
+    /// Register process and set max need (Banker's)
+    /// max_str e.g. "printer:2,disk:1"
     pub fn add_process(&mut self, pid: u32, max_str: &str) {
         if !self.processes.contains(&pid) {
             self.processes.push(pid);
@@ -81,22 +81,22 @@ impl DeadlockManager {
                 }
             }
         }
-        println!("[OK] เพิ่ม P{} max_need={}", pid, max_str);
+        println!("[OK] Added P{} max_need={}", pid, max_str);
     }
 
     // ── request_resource ─────────────────────────────────────
-    /// process ขอ resource
+    /// Process requests resource
     pub fn request_resource(&mut self, pid: u32, device: &str, amount: usize) {
         let dev = match self.devices.get_mut(device) {
             Some(d) => d,
             None => {
-                println!("[ERR] ไม่พบ device '{}'", device);
+                println!("[ERR] Device '{}' not found", device);
                 return;
             }
         };
 
         if dev.available >= amount {
-            // ให้ทันที
+            // Grant immediately
             dev.available -= amount;
             for _ in 0..amount {
                 dev.held_by.push(pid);
@@ -110,11 +110,11 @@ impl DeadlockManager {
                 .or_insert(0) += amount;
 
             println!(
-                "[IO]  P{} ได้รับ '{}' x{} → available={}",
+                "[IO]  P{} received '{}' x{} → available={}",
                 pid, device, amount, dev.available
             );
         } else {
-            // ต้องรอ → บันทึกใน request
+            // Must wait → record in request
             dev.wait_queue.push(pid);
             *self
                 .request
@@ -124,7 +124,7 @@ impl DeadlockManager {
                 .or_insert(0) += amount;
 
             println!(
-                "[IO]  P{} รอ '{}' x{} (available={} ไม่พอ) → เพิ่มใน wait queue",
+                "[IO]  P{} waiting for '{}' x{} (available={} insufficient) → added to wait queue",
                 pid, device, amount, dev.available
             );
         }
@@ -135,12 +135,12 @@ impl DeadlockManager {
         let dev = match self.devices.get_mut(device) {
             Some(d) => d,
             None => {
-                println!("[ERR] ไม่พบ device '{}'", device);
+                println!("[ERR] Device '{}' not found", device);
                 return;
             }
         };
 
-        // คืน instance
+        // Release instances
         let released = amount.min(dev.held_by.iter().filter(|&&p| p == pid).count());
         let mut removed = 0;
         dev.held_by.retain(|&p| {
@@ -153,18 +153,18 @@ impl DeadlockManager {
         });
         dev.available += released;
 
-        // อัปเดต allocation
+        // Update allocation
         if let Some(alloc) = self.allocation.get_mut(&pid) {
             let entry = alloc.entry(device.to_string()).or_insert(0);
             *entry = entry.saturating_sub(released);
         }
 
         println!(
-            "[IO]  P{} คืน '{}' x{} → available={}",
+            "[IO]  P{} released '{}' x{} → available={}",
             pid, device, released, dev.available
         );
 
-        // ปลุก process ที่รออยู่ (ถ้ามี)
+        // Wake waiting processes (if any)
         self.wake_waiting(device);
     }
 
@@ -189,14 +189,14 @@ impl DeadlockManager {
         dev.wait_queue = remaining_queue;
 
         for pid in woken {
-            println!("[IO]  P{} ได้รับ '{}' (จาก wait queue)", pid, device);
+            println!("[IO]  P{} received '{}' (from wait queue)", pid, device);
             *self
                 .allocation
                 .entry(pid)
                 .or_default()
                 .entry(device.to_string())
                 .or_insert(0) += 1;
-            // ลบออกจาก request
+            // Remove from request
             if let Some(req) = self.request.get_mut(&pid) {
                 let e = req.entry(device.to_string()).or_insert(0);
                 *e = e.saturating_sub(1);
@@ -205,13 +205,13 @@ impl DeadlockManager {
     }
 
     // ── detect_deadlock ──────────────────────────────────────
-    /// ตรวจ Deadlock ด้วย Resource Allocation Graph (Cycle Detection)
+    /// Detect Deadlock using Resource Allocation Graph (Cycle Detection)
     pub fn detect_deadlock(&self) {
         println!("\n[DEADLOCK DETECTION] Resource Allocation Graph");
         println!("  {}", "─".repeat(50));
 
-        // สร้าง wait-for graph: pid A รอ pid B
-        // ถ้า A รอ device X และ B ถือ X อยู่
+        // Build wait-for graph: pid A waits for pid B
+        // if A waits for device X and B holds X
         let mut wait_for: HashMap<u32, Vec<u32>> = HashMap::new();
 
         for (&pid, reqs) in &self.request {
@@ -223,7 +223,7 @@ impl DeadlockManager {
                     Some(d) => d,
                     None => continue,
                 };
-                // หา pid ที่ถือ device นี้อยู่
+                // Find pids holding this device
                 for &holder in &dev.held_by {
                     if holder != pid {
                         wait_for.entry(pid).or_default().push(holder);
@@ -232,9 +232,9 @@ impl DeadlockManager {
             }
         }
 
-        // แสดง wait-for graph
+        // Display wait-for graph
         if wait_for.is_empty() {
-            println!("  Wait-For Graph: (ว่าง — ไม่มีใครรอ)");
+            println!("  Wait-For Graph: (empty — no one waiting)");
         } else {
             println!("  Wait-For Graph:");
             for (&pid, waitees) in &wait_for {
@@ -243,27 +243,27 @@ impl DeadlockManager {
             }
         }
 
-        // ตรวจ Cycle ด้วย DFS
+        // Detect cycle with DFS
         let deadlocked = find_cycle(&wait_for);
 
         println!();
         if deadlocked.is_empty() {
-            println!("  ✅ ไม่พบ Deadlock");
+            println!("  ✅ No Deadlock detected");
         } else {
             let pids: Vec<String> = deadlocked.iter().map(|p| format!("P{}", p)).collect();
-            println!("  ❌ พบ DEADLOCK! กลุ่ม process ที่ติดกัน: [{}]", pids.join(", "));
+            println!("  ❌ DEADLOCK DETECTED! Deadlocked processes: [{}]", pids.join(", "));
         }
     }
 
     // ── bankers_algorithm ────────────────────────────────────
-    /// Banker's Algorithm — หา Safe Sequence
+    /// Banker's Algorithm — Find Safe Sequence
     pub fn bankers_algorithm(&self) {
         println!("\n[BANKER'S ALGORITHM] Safety Check");
         println!("  {}", "─".repeat(50));
 
         let device_names: Vec<String> = self.devices.keys().cloned().collect();
 
-        // available ปัจจุบัน
+        // Current available
         let mut work: HashMap<String, usize> = device_names
             .iter()
             .map(|d| (d.clone(), self.devices[d].available))
@@ -291,7 +291,7 @@ impl DeadlockManager {
             need.insert(pid, n);
         }
 
-        // แสดงตาราง Allocation / Need / Available
+        // Display Allocation / Need / Available table
         println!("  {:<6} {:<20} {:<20}", "PID", "Allocation", "Need");
         println!("  {}", "─".repeat(50));
         for &pid in &self.processes {
@@ -317,7 +317,7 @@ impl DeadlockManager {
                     continue;
                 }
 
-                // ตรวจว่า need[pid] <= work ทุก device
+                // Check if need[pid] <= work for all devices
                 let can_run = device_names.iter().all(|d| {
                     let n = need[&pid].get(d).copied().unwrap_or(0);
                     let w = work.get(d).copied().unwrap_or(0);
@@ -325,7 +325,7 @@ impl DeadlockManager {
                 });
 
                 if can_run {
-                    // P นี้ run ได้ → คืน resource กลับ
+                    // This process can run → release resources back
                     for d in &device_names {
                         let alloc = self
                             .allocation
@@ -356,7 +356,7 @@ impl DeadlockManager {
                 .map(|(p, _)| format!("P{}", p))
                 .collect();
             println!(
-                "  ❌ Unsafe State! Process ที่อาจติด Deadlock: [{}]",
+                "  ❌ Unsafe State! Processes potentially deadlocked: [{}]",
                 unsafe_pids.join(", ")
             );
         }
@@ -433,7 +433,7 @@ fn dfs(
             if !visited.contains(&next) {
                 dfs(next, graph, visited, rec_stack, in_cycle);
             } else if rec_stack.contains(&next) {
-                // พบ cycle
+                // Cycle detected
                 in_cycle.push(node);
                 in_cycle.push(next);
             }
